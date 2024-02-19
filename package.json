@@ -1,7 +1,7 @@
 {
   "name": "indexdb-helper",
   "version": "0.0.1",
-  "description": "Can log \"hello world\" and \"goodbye world\" to the console!",
+  "description": "simple indexdb helper",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
