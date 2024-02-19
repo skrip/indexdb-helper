@@ -15,7 +15,7 @@ export interface IStores {
   indexes?: Array<IStoreIndex>;
 }
 
-interface IModel {
+export interface IModel {
   id: string;
   name: string;
   created_at: Date;
@@ -23,7 +23,7 @@ interface IModel {
 }
 
 export class IndexDBHelper {
-  //[index: string]: Store<IAdd> | string | number | IDBFactory | IDBDatabase | ((s: string | number | Array<IStores>) => IndexDBHelper | Promise<string>);
+  [index: string]: Store<IModel> | string | number | IDBFactory | IDBDatabase | ((s: string | number | Array<IStores>) => IndexDBHelper | Promise<string>);
   private _name: string;
   private _version: number;
   private _idxdb = indexedDB;

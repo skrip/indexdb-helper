@@ -14,7 +14,7 @@ export class Store<Type> {
     this._db = db;
   }
 
-  public add(data: Record<string, Type>): Promise<string> {
+  public add(data: Type): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
         const transaction = this._db.transaction([this._name], 'readwrite');
