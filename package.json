@@ -1,7 +1,11 @@
 {
   "name": "indexdb-helper",
-  "version": "0.0.1",
-  "description": "simple indexdb helper",
+  "version": "0.0.2",
+  "description": "simple IndexedDB helper",
+  "keywords": [
+    "IndexedDB"
+  ],
+  "author": "Dhani Kuswendha",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [

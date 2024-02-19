@@ -1,1 +1,1 @@
-export {IndexDBHelper} from './idbhelper';
+export * from './idbhelper';
