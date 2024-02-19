@@ -122,6 +122,18 @@ describe('test category', () => {
     await expect(db.category.count('satu')).resolves.toEqual(1);
     const keyRangeValue = IDBKeyRange.bound('d', 't');
     await expect(db.category.count(keyRangeValue)).resolves.toEqual(2);
+
+    const result4 = await db.category.update('dua', {name: 'category edit'});
+    expect(result4).toBe('OK');
+    await expect(db.category.get('dua')).resolves.toEqual({
+      name: 'category edit',
+      color: 'blue',
+      id: 'dua',
+    });
+
+    await expect(db.category.delete('satu')).resolves.toBe('OK');
+    const result0 = await db.category.find();
+    expect(result0.length).toBe(1);
   });
 });
 
@@ -148,6 +160,8 @@ describe('test find', () => {
       })
     ).resolves.toBe('OK');
 
+    const result0 = await db.products.find();
+    expect(result0.length).toBe(4);
     const result1 = await db.products.find({skip: 0, limit: 2});
     expect(result1.length).toBe(2);
     const result2 = await db.products.find({skip: 1, limit: 2});

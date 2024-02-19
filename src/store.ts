@@ -38,17 +38,68 @@ export class Store<Type> {
     });
   }
 
-  public get(_id: string): Promise<Type> {
+  public get(id: string): Promise<Type> {
     return new Promise((resolve, reject) => {
       const transaction = this._db.transaction([this._name], 'readonly');
       const objectStore = transaction.objectStore(this._name);
-      const request = objectStore.get(_id);
+      const request = objectStore.get(id);
       request.onerror = (event) => {
         reject('error');
       };
       request.onsuccess = (event) => {
         resolve(request.result);
       };
+    });
+  }
+
+  public delete(id: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const transaction = this._db.transaction([this._name], 'readwrite');
+      const objectStore = transaction.objectStore(this._name);
+      const request = objectStore.delete(id);
+      request.onerror = (event) => {
+        reject('error');
+      };
+      request.onsuccess = (event) => {
+        resolve('OK');
+      };
+    });
+  }
+
+  public update(id: string, sdata: Type) {
+    return new Promise((resolve, reject) => {
+      try {
+        const transaction = this._db.transaction([this._name], 'readwrite');
+        const objectStore = transaction.objectStore(this._name);
+
+        const request = objectStore.get(id);
+        request.onerror = (event) => {
+          reject('error update DB');
+        };
+        request.onsuccess = (event) => {
+          let target = event.target as IDBRequest;
+          if (target) {
+            const data = target.result;
+
+            for (const property in sdata) {
+              data[property] = sdata[property];
+            }
+
+            const requestUpdate = objectStore.put(data);
+            requestUpdate.onerror = (event) => {
+              reject('error update Setting');
+            };
+            requestUpdate.onsuccess = (event) => {
+              resolve('OK');
+            };
+          } else {
+            reject('error update Setting');
+          }
+        };
+      } catch (error) {
+        reject(error);
+      }
+      
     });
   }
 
@@ -79,7 +130,13 @@ export class Store<Type> {
       };
       let first = true;
       let count = 0;
-      let request = objectStore.openCursor(q.query, q.direction);
+      if (q == undefined) {
+        q = {};
+      }
+      let request = objectStore.openCursor(
+        q.query ? q.query : undefined,
+        q.direction ? q.direction : undefined
+      );
       if (q.index) {
         const myIndex = objectStore.index(q.index);
         request = myIndex.openCursor(q.query, q.direction);

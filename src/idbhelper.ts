@@ -54,6 +54,12 @@ export class IndexDBHelper {
 
       openOrCreateDB.addEventListener('success', () => {
         this._db = openOrCreateDB.result;
+        for (let i = 0; i < data.length; i++) {
+          const inew: Record<string, Store<IModel>> = {};
+
+          inew[data[i].name] = new Store(data[i].name, this._db);
+          Object.assign(this, inew);
+        }
         resolve('Successfully opened DB');
       });
 
@@ -77,10 +83,6 @@ export class IndexDBHelper {
                 });
               }
             }
-            const inew: Record<string, Store<IModel>> = {};
-
-            inew[data[i].name] = new Store(data[i].name, db);
-            Object.assign(this, inew);
           }
         }
       });
