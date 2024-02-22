@@ -175,3 +175,44 @@ describe('test find', () => {
     expect(result3.length).toBe(2);
   });
 });
+
+describe('test close db and upgrade', () => {
+  test('test close upgrade db', async () => {
+    db.close();
+    result = await db.versions(2).stores([
+      {
+        name: 'users',
+      },
+      {
+        name: 'products',
+        autoIncrement: true,
+        indexes: [
+          {
+            name: 'name',
+            path: 'name',
+            unique: false,
+          },
+        ],
+      },
+      {
+        name: 'category',
+        indexes: [
+          {
+            name: 'name',
+            path: 'name',
+            unique: true,
+          },
+          {
+            name: 'color',
+            path: 'color',
+            unique: false,
+          },
+        ],
+      },
+    ]);
+    expect(result).toBe('Successfully opened DB');
+    expect(db.users).toBeInstanceOf(Store);
+    expect(db.products).toBeInstanceOf(Store);
+    expect(db.category).toBeInstanceOf(Store);
+  });
+});

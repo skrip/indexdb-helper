@@ -23,7 +23,7 @@ export interface IModel {
 }
 
 export class IndexDBHelper {
-  [index: string]: Store<IModel> | string | number | IDBFactory | IDBDatabase | ((s: string | number | Array<IStores>) => IndexDBHelper | Promise<string>);
+  [index: string]: Store<IModel> | string | number | IDBFactory | IDBDatabase | ((s: string | number | Array<IStores>) => IndexDBHelper | Promise<string>) | (() => void) ;
   private _name: string;
   private _version: number;
   private _idxdb = indexedDB;
@@ -36,6 +36,12 @@ export class IndexDBHelper {
       if (option.indexedDB) {
         this._idxdb = option.indexedDB;
       }
+    }
+  }
+
+  close(){
+    if(this._db){
+      this._db.close();
     }
   }
 
@@ -69,18 +75,22 @@ export class IndexDBHelper {
 
         if (Array.isArray(data)) {
           for (let i = 0; i < data.length; i++) {
-            const objStore = db.createObjectStore(data[i].name, {
-              keyPath: data[i].key ? data[i].key : 'id',
-              autoIncrement: data[i].autoIncrement
-                ? data[i].autoIncrement
-                : false,
-            });
-            if (Array.isArray(data[i].indexes)) {
-              for (let x = 0; x < data[i].indexes.length; x++) {
-                let index = data[i].indexes[x];
-                objStore.createIndex(index.name, index.path, {
-                  unique: index.unique,
-                });
+            if (!db.objectStoreNames.contains(data[i].name)) {
+              //db.deleteObjectStore(collectionName.STATES);
+
+              const objStore = db.createObjectStore(data[i].name, {
+                keyPath: data[i].key ? data[i].key : 'id',
+                autoIncrement: data[i].autoIncrement
+                  ? data[i].autoIncrement
+                  : false,
+              });
+              if (Array.isArray(data[i].indexes)) {
+                for (let x = 0; x < data[i].indexes.length; x++) {
+                  let index = data[i].indexes[x];
+                  objStore.createIndex(index.name, index.path, {
+                    unique: index.unique,
+                  });
+                }
               }
             }
           }
