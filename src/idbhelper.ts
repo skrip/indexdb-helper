@@ -2,6 +2,9 @@ import {Store} from './store';
 
 export interface IndbOption {
   indexedDB?: typeof indexedDB;
+  pushUrl?: string;
+  pullUrl?: string;
+  lastUpdateName?: string;
 }
 export interface IStoreIndex {
   name: string;
@@ -11,6 +14,7 @@ export interface IStoreIndex {
 export interface IStores {
   name: string;
   key?: string;
+  sync?: boolean;
   autoIncrement?: boolean;
   indexes?: Array<IStoreIndex>;
 }
@@ -23,11 +27,22 @@ export interface IModel {
 }
 
 export class IndexDBHelper {
-  [index: string]: Store<IModel> | string | number | IDBFactory | IDBDatabase | ((s: string | number | Array<IStores>) => IndexDBHelper | Promise<string>) | (() => void) ;
+  [index: string]:
+    | Store<IModel>
+    | string
+    | number
+    | IDBFactory
+    | IDBDatabase
+    | ((s: string | number | Array<IStores>) => IndexDBHelper | Promise<string>)
+    | (() => void);
   private _name: string;
   private _version: number;
   private _idxdb = indexedDB;
   private _db: IDBDatabase;
+  private _nameTableSetting = 'setting';
+  private _pushUrl = '';
+  private _pullUrl = '';
+  private _lastUpdateName = 'last_update';
 
   constructor(name: string, option?: IndbOption) {
     this._name = name;
@@ -36,11 +51,20 @@ export class IndexDBHelper {
       if (option.indexedDB) {
         this._idxdb = option.indexedDB;
       }
+      if (option.pushUrl) {
+        this._pushUrl = option.pushUrl;
+      }
+      if (option.pullUrl) {
+        this._pullUrl = option.pullUrl;
+      }
+      if (option.lastUpdateName) {
+        this._lastUpdateName = option.lastUpdateName;
+      }
     }
   }
 
-  close(){
-    if(this._db){
+  close() {
+    if (this._db) {
       this._db.close();
     }
   }
@@ -48,6 +72,30 @@ export class IndexDBHelper {
   versions(version: number) {
     this._version = version;
     return this;
+  }
+
+  push() {
+    let cek = [];
+    for (let key in this) {
+      if (this[key].constructor.name === 'Store') {
+        if ((this[key] as Store<IModel>).isSync) {
+          cek.push((this[key] as Store<IModel>).name);
+        }
+      }
+    }
+    return cek;
+  }
+
+  pull() {
+    let cek = [];
+    for (let key in this) {
+      if (this[key].constructor.name === 'Store') {
+        if ((this[key] as Store<IModel>).isSync) {
+          cek.push((this[key] as Store<IModel>).name);
+        }
+      }
+    }
+    return cek;
   }
 
   stores(data: Array<IStores>): Promise<string> {
@@ -63,7 +111,22 @@ export class IndexDBHelper {
         for (let i = 0; i < data.length; i++) {
           const inew: Record<string, Store<IModel>> = {};
 
-          inew[data[i].name] = new Store(data[i].name, this._db);
+          inew[data[i].name] = new Store(
+            data[i].name,
+            this._db,
+            data[i].sync ? true : false
+          );
+          Object.assign(this, inew);
+        }
+
+        // create sync
+        if (data.length > 0) {
+          const inew: Record<string, Store<IModel>> = {};
+
+          inew[this._nameTableSetting] = new Store(
+            this._nameTableSetting,
+            this._db
+          );
           Object.assign(this, inew);
         }
         resolve('Successfully opened DB');
@@ -94,6 +157,16 @@ export class IndexDBHelper {
               }
             }
           }
+
+          // create sync
+          if (data.length > 0) {
+            if (!db.objectStoreNames.contains(this._nameTableSetting)) {
+              const objStore = db.createObjectStore(this._nameTableSetting, {
+                keyPath: 'name',
+                autoIncrement: false,
+              });
+            }
+          }
         }
       });
     });
@@ -101,5 +174,17 @@ export class IndexDBHelper {
 
   get Db() {
     return this._db;
+  }
+
+  get pushUrl() {
+    return this._pushUrl;
+  }
+
+  get pullUrl() {
+    return this._pullUrl;
+  }
+
+  get lastUpdateName() {
+    return this._lastUpdateName;
   }
 }

@@ -6,12 +6,16 @@ export interface IFIndQuery {
   index?: string;
 }
 
+type TFindFunc<Type> = (d: Type) => boolean;
+
 export class Store<Type> {
   private _name: string;
   private _db: IDBDatabase;
-  constructor(name: string, db: IDBDatabase) {
+  private _sync: boolean = false;
+  constructor(name: string, db: IDBDatabase, sync: boolean = false) {
     this._name = name;
     this._db = db;
+    this._sync = sync;
   }
 
   public add(data: Type): Promise<string> {
@@ -99,7 +103,6 @@ export class Store<Type> {
       } catch (error) {
         reject(error);
       }
-      
     });
   }
 
@@ -118,7 +121,47 @@ export class Store<Type> {
     });
   }
 
-  public find(q: IFIndQuery): Promise<Type[]> {
+  public findCursor(
+    fn: TFindFunc<Type>,
+    index: string | undefined
+  ): Promise<Type[]> {
+    return new Promise((resolve, reject) => {
+      const transaction = this._db.transaction([this._name], 'readonly');
+      const objectStore = transaction.objectStore(this._name);
+
+      let catCursor;
+      let hasil: Array<Type> = [];
+      transaction.oncomplete = (e) => {
+        resolve(hasil);
+      };
+      if (fn == undefined) {
+        reject('error');
+      }
+      let request = objectStore.openCursor();
+      if (index) {
+        const myIndex = objectStore.index(index);
+        request = myIndex.openCursor();
+      }
+      request.onsuccess = (event) => {
+        let target = event.target as IDBRequest;
+        if (target) {
+          catCursor = target.result;
+          if (catCursor) {
+            if (fn(catCursor.value)) {
+              hasil.push(catCursor.value);
+            }
+            catCursor.continue();
+          }
+        }
+      };
+
+      request.onerror = () => {
+        reject('error');
+      };
+    });
+  }
+
+  public findKey(q: IFIndQuery): Promise<Type[]> {
     return new Promise((resolve, reject) => {
       const transaction = this._db.transaction([this._name], 'readonly');
       const objectStore = transaction.objectStore(this._name);
@@ -183,5 +226,13 @@ export class Store<Type> {
         reject('error');
       };
     });
+  }
+
+  get name() {
+    return this._name;
+  }
+
+  get isSync() {
+    return this._sync;
   }
 }

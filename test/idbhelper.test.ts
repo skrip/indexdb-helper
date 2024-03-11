@@ -4,14 +4,26 @@ import {Store} from '../src/store';
 let db;
 let result;
 beforeAll(async () => {
-  db = new IndexDBHelper('myPOSDb');
+  db = new IndexDBHelper('myPOSDb', {
+    pushUrl: 'http://localhost:8080/push',
+    pullUrl: 'http://localhost:8080/pull',
+  });
   result = await db.versions(1).stores([
     {
       name: 'users',
+      sync: true,
+      indexes: [
+        {
+          name: 'last_update',
+          path: 'last_update',
+          unique: false,
+        },
+      ],
     },
     {
       name: 'products',
       autoIncrement: true,
+      sync: true,
       indexes: [
         {
           name: 'name',
@@ -44,6 +56,40 @@ describe('test 1', () => {
     expect(db.users).toBeInstanceOf(Store);
     expect(db.products).toBeInstanceOf(Store);
     expect(db.category).toBeInstanceOf(Store);
+    expect(db.setting).toBeInstanceOf(Store);
+    expect(db.push()).toEqual(['users', 'products']);
+    expect(db.pull()).toEqual(['users', 'products']);
+    expect(db.pullUrl).toBe('http://localhost:8080/pull');
+    expect(db.pushUrl).toBe('http://localhost:8080/push');
+    expect(db.lastUpdateName).toBe('last_update');
+  });
+});
+
+//new Date('2023-10-01T12:00:00.000Z')
+describe('test last update', () => {
+  test('test last update in users', async () => {
+    await expect(
+      db.users.add({
+        id: 'users_1',
+        name: 'users 1',
+        last_update: 100,
+      })
+    ).resolves.toBe('OK');
+
+    await expect(
+      db.users.add({
+        id: 'users_2',
+        name: 'users 2',
+        last_update: 90,
+      })
+    ).resolves.toBe('OK');
+
+    const keyRangeValue = IDBKeyRange.upperBound(90);
+    const result3 = await db.users.findKey({
+      index: 'last_update',
+      query: keyRangeValue,
+    });
+    expect(result3.length).toBe(1);
   });
 });
 
@@ -86,6 +132,15 @@ describe('test 2', () => {
       db.users.add({
         name: 'saya',
         id: 'saya2',
+      })
+    ).resolves.toBe('OK');
+  });
+
+  test('test add setting', async () => {
+    await expect(
+      db.setting.add({
+        name: 'saya',
+        last_update: new Date(),
       })
     ).resolves.toBe('OK');
   });
@@ -132,7 +187,7 @@ describe('test category', () => {
     });
 
     await expect(db.category.delete('satu')).resolves.toBe('OK');
-    const result0 = await db.category.find();
+    const result0 = await db.category.findKey();
     expect(result0.length).toBe(1);
   });
 });
@@ -160,19 +215,24 @@ describe('test find', () => {
       })
     ).resolves.toBe('OK');
 
-    const result0 = await db.products.find();
+    const result0 = await db.products.findKey();
     expect(result0.length).toBe(4);
-    const result1 = await db.products.find({skip: 0, limit: 2});
+    const result1 = await db.products.findKey({skip: 0, limit: 2});
     expect(result1.length).toBe(2);
-    const result2 = await db.products.find({skip: 1, limit: 2});
+    expect(result1[0].name).toEqual('satu');
+    const result2 = await db.products.findKey({skip: 1, limit: 2});
+    expect(result2[0].name).toEqual('dua');
     expect(result2.length).toBe(2);
 
     const keyRangeValue = IDBKeyRange.only('satu');
-    const result3 = await db.products.find({
+    const result3 = await db.products.findKey({
       index: 'name',
       query: keyRangeValue,
     });
     expect(result3.length).toBe(2);
+
+    const result4 = await db.products.findCursor((d) => d.name == 'dua');
+    expect(result4.length).toBe(2);
   });
 });
 
@@ -182,6 +242,9 @@ describe('test close db and upgrade', () => {
     result = await db.versions(2).stores([
       {
         name: 'users',
+      },
+      {
+        name: 'roles',
       },
       {
         name: 'products',
