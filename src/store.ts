@@ -12,7 +12,7 @@ export interface IFIndCursorOption {
   index?: string;
 }
 
-type TFindFunc<Type> = (d: Type) => Type | undefined | false;
+type TFindFunc<Type> = (d: Type) => Type | undefined | boolean;
 
 export class Store<Type> {
   private _name: string;
@@ -138,7 +138,7 @@ export class Store<Type> {
         resolve(count);
       };
       if (fn == undefined) {
-        reject('error');
+        fn = () => true;
       }
       let request = objectStore.openCursor();
       request.onsuccess = (event) => {
@@ -178,7 +178,7 @@ export class Store<Type> {
         resolve(hasil);
       };
       if (fn == undefined) {
-        reject('error');
+        fn = () => true;
       }
       let request = objectStore.openCursor();
       if (option === undefined) {

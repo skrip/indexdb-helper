@@ -270,6 +270,9 @@ describe('test find', () => {
 
     const result3 = await db.products.countCursor((d) => d.name == 'dua');
     expect(result3).toBe(2);
+
+    const result4 = await db.products.countCursor();
+    expect(result4).toBe(4);
   });
 });
 
