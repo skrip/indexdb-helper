@@ -1,5 +1,12 @@
 # indexdb-helper
 
+install with
+[npm](https://www.npmjs.com/):
+
+```bash
+npm i indexdb-helper
+```
+
 ```js
 const db = new IndexDBHelper('NamaDB');
 await db.versions(1).stores([
