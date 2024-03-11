@@ -197,21 +197,25 @@ describe('test find', () => {
     await expect(
       db.products.add({
         name: 'satu',
+        price: 100,
       })
     ).resolves.toBe('OK');
     await expect(
       db.products.add({
         name: 'satu',
+        price: 200,
       })
     ).resolves.toBe('OK');
     await expect(
       db.products.add({
         name: 'dua',
+        price: 300,
       })
     ).resolves.toBe('OK');
     await expect(
       db.products.add({
         name: 'dua',
+        price: 400,
       })
     ).resolves.toBe('OK');
 
@@ -221,8 +225,12 @@ describe('test find', () => {
     expect(result1.length).toBe(2);
     expect(result1[0].name).toEqual('satu');
     const result2 = await db.products.findKey({skip: 1, limit: 2});
-    expect(result2[0].name).toEqual('dua');
+    expect(result2[0].name).toEqual('satu');
     expect(result2.length).toBe(2);
+
+    const result22 = await db.products.findKey({skip: 2, limit: 2});
+    expect(result22[0].name).toEqual('dua');
+    expect(result22.length).toBe(2);
 
     const keyRangeValue = IDBKeyRange.only('satu');
     const result3 = await db.products.findKey({
@@ -230,9 +238,35 @@ describe('test find', () => {
       query: keyRangeValue,
     });
     expect(result3.length).toBe(2);
+  });
 
-    const result4 = await db.products.findCursor((d) => d.name == 'dua');
-    expect(result4.length).toBe(2);
+  test('test find cursor', async () => {
+    const result1 = await db.products.findCursor((d) => d.name == 'dua');
+    expect(result1.length).toBe(2);
+
+    const result2 = await db.products.findCursor((d) => {
+      if (d.name == 'dua') {
+        d.total = d.price + 100;
+        return d;
+      }
+      return false;
+    });
+    expect(result2.length).toBe(2);
+    const expected = [
+      {
+        id: 3,
+        name: 'dua',
+        price: 300,
+        total: 400,
+      },
+      {
+        id: 4,
+        name: 'dua',
+        price: 400,
+        total: 500,
+      },
+    ];
+    expect(result2).toEqual(expected);
   });
 });
 

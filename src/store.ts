@@ -6,7 +6,13 @@ export interface IFIndQuery {
   index?: string;
 }
 
-type TFindFunc<Type> = (d: Type) => boolean;
+export interface IFIndCursorOption {
+  skip?: number;
+  limit?: number;
+  index?: string;
+}
+
+type TFindFunc<Type> = (d: Type) => Type | undefined | false;
 
 export class Store<Type> {
   private _name: string;
@@ -123,13 +129,16 @@ export class Store<Type> {
 
   public findCursor(
     fn: TFindFunc<Type>,
-    index: string | undefined
+    option: IFIndCursorOption | undefined
   ): Promise<Type[]> {
     return new Promise((resolve, reject) => {
       const transaction = this._db.transaction([this._name], 'readonly');
       const objectStore = transaction.objectStore(this._name);
 
       let catCursor;
+      let first = true;
+      let count = 0;
+      let skip = 0;
       let hasil: Array<Type> = [];
       transaction.oncomplete = (e) => {
         resolve(hasil);
@@ -138,19 +147,75 @@ export class Store<Type> {
         reject('error');
       }
       let request = objectStore.openCursor();
-      if (index) {
-        const myIndex = objectStore.index(index);
+      if (option === undefined) {
+        option = {};
+      }
+      if (option.index) {
+        const myIndex = objectStore.index(option.index);
         request = myIndex.openCursor();
+      }
+      if (option.skip == undefined) {
+        option.skip = 0;
       }
       request.onsuccess = (event) => {
         let target = event.target as IDBRequest;
         if (target) {
           catCursor = target.result;
           if (catCursor) {
-            if (fn(catCursor.value)) {
-              hasil.push(catCursor.value);
+            if (first) {
+              if (option.skip == 0) {
+                let dt = fn(catCursor.value);
+                if (dt !== undefined && dt !== false) {
+                  if (dt === true) {
+                    hasil.push(catCursor.value);
+                  } else {
+                    hasil.push(dt);
+                  }
+                  count++;
+                  first = false;
+                }
+              } else {
+                let dt = fn(catCursor.value);
+                if (dt !== undefined && dt !== false) {
+                  skip++;
+                  if (skip > option.skip) {
+                    if (dt === true) {
+                      hasil.push(catCursor.value);
+                    } else {
+                      hasil.push(dt);
+                    }
+                    count++;
+                    first = false;
+                  }
+                }
+              }
+              catCursor.continue();
+            } else {
+              if (option.limit) {
+                if (count < option.limit) {
+                  let dt = fn(catCursor.value);
+                  if (dt !== undefined && dt !== false) {
+                    if (dt === true) {
+                      hasil.push(catCursor.value);
+                    } else {
+                      hasil.push(dt);
+                    }
+                    count++;
+                  }
+                }
+              } else {
+                let dt = fn(catCursor.value);
+                if (dt !== undefined && dt !== false) {
+                  if (dt === true) {
+                    hasil.push(catCursor.value);
+                  } else {
+                    hasil.push(dt);
+                  }
+                  count++;
+                }
+              }
+              catCursor.continue();
             }
-            catCursor.continue();
           }
         }
       };
@@ -199,9 +264,10 @@ export class Store<Type> {
                 count++;
                 first = false;
               } else {
-                if (q.limit) {
-                  catCursor.advance(q.skip * q.limit);
-                }
+                // if (q.limit) {
+                //   catCursor.advance(q.skip * q.limit);
+                // }
+                catCursor.advance(q.skip);
 
                 first = false;
               }
