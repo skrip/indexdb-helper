@@ -127,7 +127,7 @@ export class Store<Type> {
     });
   }
 
-  public countCursor(fn: TFindFunc<Type>): Promise<number> {
+  public countCursor(fn: TFindFunc<Type> | undefined): Promise<number> {
     return new Promise((resolve, reject) => {
       const transaction = this._db.transaction([this._name], 'readonly');
       const objectStore = transaction.objectStore(this._name);
@@ -162,7 +162,7 @@ export class Store<Type> {
   }
 
   public findCursor(
-    fn: TFindFunc<Type>,
+    fn: TFindFunc<Type> | undefined,
     option: IFIndCursorOption | undefined
   ): Promise<Type[]> {
     return new Promise((resolve, reject) => {

@@ -1,6 +1,6 @@
 {
   "name": "indexdb-helper",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "description": "simple IndexedDB helper",
   "keywords": [
     "IndexedDB"
