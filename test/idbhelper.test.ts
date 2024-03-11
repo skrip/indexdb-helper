@@ -267,6 +267,9 @@ describe('test find', () => {
       },
     ];
     expect(result2).toEqual(expected);
+
+    const result3 = await db.products.countCursor((d) => d.name == 'dua');
+    expect(result3).toBe(2);
   });
 });
 

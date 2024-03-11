@@ -127,6 +127,40 @@ export class Store<Type> {
     });
   }
 
+  public countCursor(fn: TFindFunc<Type>): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const transaction = this._db.transaction([this._name], 'readonly');
+      const objectStore = transaction.objectStore(this._name);
+
+      let catCursor;
+      let count = 0;
+      transaction.oncomplete = (e) => {
+        resolve(count);
+      };
+      if (fn == undefined) {
+        reject('error');
+      }
+      let request = objectStore.openCursor();
+      request.onsuccess = (event) => {
+        let target = event.target as IDBRequest;
+        if (target) {
+          catCursor = target.result;
+          if (catCursor) {
+            let dt = fn(catCursor.value);
+            if (dt !== undefined && dt !== false) {
+              count++;
+            }
+            catCursor.continue();
+          }
+        }
+      };
+
+      request.onerror = () => {
+        reject('error');
+      };
+    });
+  }
+
   public findCursor(
     fn: TFindFunc<Type>,
     option: IFIndCursorOption | undefined
