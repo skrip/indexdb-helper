@@ -109,18 +109,25 @@ export class IndexDBHelper {
         if (storeTable.isSync) {
           let tbname = storeTable.name;
           let setting = await storeSetting.get(tbname);
-          let s = new Date();
+          let s = null;
           if (setting) {
             // sudah pernah sync
             if (setting.last_push) {
-              s = new Date(setting.last_push);
+              s = new Date(setting.last_push).toISOString();
             }
           }
-          const keyRangeValue = IDBKeyRange.lowerBound(s.toISOString());
-          const result = await storeTable.findKey({
-            index: this._lastUpdateName,
-            query: keyRangeValue,
-          });
+          let result;
+          if (s !== null) {
+            const keyRangeValue = IDBKeyRange.lowerBound(s);
+            result = await storeTable.findKey({
+              index: this._lastUpdateName,
+              query: keyRangeValue,
+            });
+          } else {
+            result = await storeTable.findKey({
+              index: this._lastUpdateName,
+            });
+          }
 
           if (result.length > 0) {
             let res = await this.pushData(
