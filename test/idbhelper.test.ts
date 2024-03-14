@@ -3,6 +3,7 @@ import {Store} from '../src/store';
 
 const response = {
   success: true,
+  data: [{_id: 'testdata'}],
 };
 
 global.fetch = jest.fn(() =>
@@ -140,7 +141,7 @@ describe('test last update', () => {
     expect(result.length).toBe(1);
     expect(result[0].name).toBe('users');
 
-    expect(db.pull()).toEqual(['users', 'products']);
+    await expect(db.pull()).resolves.toEqual(['users', 'products']);
   });
 });
 

@@ -24,7 +24,8 @@ export interface IModel {
   name?: string;
   created_at?: string;
   updated_at?: string;
-  last_update?: string;
+  last_push?: string;
+  last_pull?: string;
 }
 
 export class IndexDBHelper {
@@ -90,6 +91,15 @@ export class IndexDBHelper {
     }
   };
 
+  pullData = async (url = '') => {
+    try {
+      const response = await fetch(url);
+      return response.json();
+    } catch (error) {
+      return 'ERROR';
+    }
+  };
+
   async push() {
     let cek = [];
     for (let key in this) {
@@ -102,7 +112,9 @@ export class IndexDBHelper {
           let s = new Date();
           if (setting) {
             // sudah pernah sync
-            s = new Date(setting.last_update);
+            if (setting.last_push) {
+              s = new Date(setting.last_push);
+            }
           }
           const keyRangeValue = IDBKeyRange.lowerBound(s.toISOString());
           const result = await storeTable.findKey({
@@ -119,15 +131,14 @@ export class IndexDBHelper {
               if (!res.error) {
                 cek.push(tbname);
                 if (setting) {
-                  // sudah pernah sync
                   await storeSetting.update(tbname, {
                     name: tbname,
-                    last_update: new Date().toISOString(),
+                    last_push: new Date().toISOString(),
                   });
                 } else {
                   await storeSetting.add({
                     name: tbname,
-                    last_update: new Date().toISOString(),
+                    last_push: new Date().toISOString(),
                   });
                 }
               }
@@ -139,12 +150,55 @@ export class IndexDBHelper {
     return cek;
   }
 
-  pull() {
+  async pull() {
     let cek = [];
     for (let key in this) {
       if (this[key].constructor.name === 'Store') {
-        if ((this[key] as Store<IModel>).isSync) {
-          cek.push((this[key] as Store<IModel>).name);
+        let storeTable = this[key] as Store<IModel>;
+        let storeSetting = this.setting as Store<IModel>;
+        if (storeTable.isSync) {
+          let tbname = storeTable.name;
+          let setting = await storeSetting.get(tbname);
+          let s = new Date();
+          if (setting) {
+            // sudah pernah sync
+            if (setting.last_pull) {
+              s = new Date(setting.last_pull);
+            }
+          }
+          let data = await this.pullData(
+            this._pullUrl + `?table=${tbname}&last_update=${s.toISOString()}`
+          );
+          if (data.success) {
+            if (data.data.length > 0) {
+              cek.push(tbname);
+              for (let i = 0; i < data.data.length; i++) {
+                let row = data.data[i];
+                let kid = row[storeTable.keyPath];
+                if (kid) {
+                  let dt = await storeTable.get(kid);
+                  if (dt) {
+                    // update
+                    await storeTable.update(kid, row);
+                  } else {
+                    // insert
+                    await storeTable.add(row);
+                  }
+                }
+              }
+              if (setting) {
+                await storeSetting.update(tbname, {
+                  name: tbname,
+                  last_pull: new Date().toISOString(),
+                });
+              } else {
+                await storeSetting.add({
+                  name: tbname,
+                  last_pull: new Date().toISOString(),
+                });
+              }
+            }
+          }
         }
       }
     }
@@ -164,9 +218,11 @@ export class IndexDBHelper {
         for (let i = 0; i < data.length; i++) {
           const inew: Record<string, Store<IModel>> = {};
 
+          let keyPath = data[i].key ? data[i].key : 'id';
           inew[data[i].name] = new Store(
             data[i].name,
             this._db,
+            keyPath,
             data[i].sync ? true : false
           );
           Object.assign(this, inew);
@@ -178,7 +234,8 @@ export class IndexDBHelper {
 
           inew[this._nameTableSetting] = new Store(
             this._nameTableSetting,
-            this._db
+            this._db,
+            'name'
           );
           Object.assign(this, inew);
         }

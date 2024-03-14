@@ -16,12 +16,19 @@ type TFindFunc<Type> = (d: Type) => Type | undefined | boolean;
 
 export class Store<Type> {
   private _name: string;
+  private _keyPath: string;
   private _db: IDBDatabase;
   private _sync: boolean = false;
-  constructor(name: string, db: IDBDatabase, sync: boolean = false) {
+  constructor(
+    name: string,
+    db: IDBDatabase,
+    keyPath: string,
+    sync: boolean = false
+  ) {
     this._name = name;
     this._db = db;
     this._sync = sync;
+    this._keyPath = keyPath;
   }
 
   public add(data: Type): Promise<string> {
@@ -334,5 +341,9 @@ export class Store<Type> {
 
   get isSync() {
     return this._sync;
+  }
+
+  get keyPath() {
+    return this._keyPath;
   }
 }
