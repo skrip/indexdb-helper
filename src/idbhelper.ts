@@ -20,10 +20,11 @@ export interface IStores {
 }
 
 export interface IModel {
-  id: string;
-  name: string;
-  created_at: Date;
-  update_at: Date;
+  id?: string;
+  name?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_update?: string;
 }
 
 export class IndexDBHelper {
@@ -74,12 +75,64 @@ export class IndexDBHelper {
     return this;
   }
 
-  push() {
+  pushData = async (url = '', data = {}) => {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      return response.json();
+    } catch (error) {
+      return 'ERROR';
+    }
+  };
+
+  async push() {
     let cek = [];
     for (let key in this) {
       if (this[key].constructor.name === 'Store') {
-        if ((this[key] as Store<IModel>).isSync) {
-          cek.push((this[key] as Store<IModel>).name);
+        let storeTable = this[key] as Store<IModel>;
+        let storeSetting = this.setting as Store<IModel>;
+        if (storeTable.isSync) {
+          let tbname = storeTable.name;
+          let setting = await storeSetting.get(tbname);
+          let s = new Date();
+          if (setting) {
+            // sudah pernah sync
+            s = new Date(setting.last_update);
+          }
+          const keyRangeValue = IDBKeyRange.upperBound(s.toISOString());
+          const result = await storeTable.findKey({
+            index: this._lastUpdateName,
+            query: keyRangeValue,
+          });
+          
+          if (result.length > 0) {
+            let res = await this.pushData(
+              this._pushUrl + `?table=${tbname}`,
+              result
+            );
+            if (res !== 'ERROR') {
+              if (!res.error) {
+                cek.push(tbname);
+                if (setting) {
+                  // sudah pernah sync
+                  await storeSetting.update(tbname, {
+                    name: tbname,
+                    last_update: new Date().toISOString(),
+                  });
+                } else {
+                  await storeSetting.add({
+                    name: tbname,
+                    last_update: new Date().toISOString(),
+                  });
+                }
+              }
+            }
+          }
         }
       }
     }

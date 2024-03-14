@@ -1,12 +1,24 @@
 import {IndexDBHelper} from '../src/idbhelper';
 import {Store} from '../src/store';
 
+const response = {
+  success: true,
+};
+
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    json: () => Promise.resolve(response),
+  })
+) as jest.Mock;
+
 let db;
 let result;
+let pushurl = 'http://localhost:8080/api/sync/push';
+let pullurl = 'http://localhost:8080/api/sync/pull';
 beforeAll(async () => {
   db = new IndexDBHelper('myPOSDb', {
-    pushUrl: 'http://localhost:8080/push',
-    pullUrl: 'http://localhost:8080/pull',
+    pushUrl: pushurl,
+    pullUrl: pullurl,
   });
   result = await db.versions(1).stores([
     {
@@ -28,6 +40,11 @@ beforeAll(async () => {
         {
           name: 'name',
           path: 'name',
+          unique: false,
+        },
+        {
+          name: 'last_update',
+          path: 'last_update',
           unique: false,
         },
       ],
@@ -57,10 +74,8 @@ describe('test 1', () => {
     expect(db.products).toBeInstanceOf(Store);
     expect(db.category).toBeInstanceOf(Store);
     expect(db.setting).toBeInstanceOf(Store);
-    expect(db.push()).toEqual(['users', 'products']);
-    expect(db.pull()).toEqual(['users', 'products']);
-    expect(db.pullUrl).toBe('http://localhost:8080/pull');
-    expect(db.pushUrl).toBe('http://localhost:8080/push');
+    expect(db.pullUrl).toBe(pullurl);
+    expect(db.pushUrl).toBe(pushurl);
     expect(db.lastUpdateName).toBe('last_update');
   });
 });
@@ -68,11 +83,14 @@ describe('test 1', () => {
 //new Date('2023-10-01T12:00:00.000Z')
 describe('test last update', () => {
   test('test last update in users', async () => {
+    let d2 = new Date('2023-10-02T12:00:00.000Z');
+    let d3 = new Date('2023-10-02T10:00:00.000Z');
+
     await expect(
       db.users.add({
         id: 'users_1',
         name: 'users 1',
-        last_update: 100,
+        last_update: d2.toISOString(), //100, //new Date('2023-10-02T12:00:00.000Z'),
       })
     ).resolves.toBe('OK');
 
@@ -80,16 +98,39 @@ describe('test last update', () => {
       db.users.add({
         id: 'users_2',
         name: 'users 2',
-        last_update: 90,
+        last_update: d3.toISOString(), //90, //new Date('2023-10-01T12:00:00.000Z'), //
       })
     ).resolves.toBe('OK');
 
-    const keyRangeValue = IDBKeyRange.upperBound(90);
+    const result1 = await db.users.findCursor(undefined, {
+      index: 'last_update',
+    });
+    expect(result1.length).toBe(2);
+    expect(result1[0].id).toBe('users_2');
+
+    const result2 = await db.users.findKey({
+      index: 'last_update',
+    });
+    expect(result2.length).toBe(2);
+    expect(result2[0].id).toBe('users_2');
+
+    let s = new Date('2023-10-02T12:00:00.000Z');
+    const keyRangeValue = IDBKeyRange.upperBound(s.toISOString()); //new Date('2023-10-02T12:00:00.000Z')
     const result3 = await db.users.findKey({
       index: 'last_update',
       query: keyRangeValue,
     });
-    expect(result3.length).toBe(1);
+    expect(result3.length).toBe(2);
+  });
+
+  test('test push pull', async () => {
+    await expect(db.push()).resolves.toEqual(['users']); //, 'products'
+
+    const result = await db.setting.findKey();
+    expect(result.length).toBe(1);
+    expect(result[0].name).toBe('users');
+
+    expect(db.pull()).toEqual(['users', 'products']);
   });
 });
 
