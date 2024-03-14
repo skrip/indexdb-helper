@@ -159,15 +159,15 @@ export class IndexDBHelper {
         if (storeTable.isSync) {
           let tbname = storeTable.name;
           let setting = await storeSetting.get(tbname);
-          let s = new Date();
+          let s = null;
           if (setting) {
             // sudah pernah sync
             if (setting.last_pull) {
-              s = new Date(setting.last_pull);
+              s = new Date(setting.last_pull).toISOString();
             }
           }
           let data = await this.pullData(
-            this._pullUrl + `?table=${tbname}&last_update=${s.toISOString()}`
+            this._pullUrl + `?table=${tbname}&last_update=${s}`
           );
           if (data.success) {
             if (data.data.length > 0) {
