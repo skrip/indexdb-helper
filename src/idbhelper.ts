@@ -104,12 +104,12 @@ export class IndexDBHelper {
             // sudah pernah sync
             s = new Date(setting.last_update);
           }
-          const keyRangeValue = IDBKeyRange.upperBound(s.toISOString());
+          const keyRangeValue = IDBKeyRange.lowerBound(s.toISOString());
           const result = await storeTable.findKey({
             index: this._lastUpdateName,
             query: keyRangeValue,
           });
-          
+
           if (result.length > 0) {
             let res = await this.pushData(
               this._pushUrl + `?table=${tbname}`,

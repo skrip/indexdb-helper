@@ -124,6 +124,16 @@ describe('test last update', () => {
   });
 
   test('test push pull', async () => {
+    let d2 = new Date();
+    d2.setDate(d2.getDate() + 1);
+    await expect(
+      db.users.add({
+        id: 'users_3',
+        name: 'users 3',
+        last_update: d2.toISOString(), //100, //new Date('2023-10-02T12:00:00.000Z'),
+      })
+    ).resolves.toBe('OK');
+
     await expect(db.push()).resolves.toEqual(['users']); //, 'products'
 
     const result = await db.setting.findKey();
