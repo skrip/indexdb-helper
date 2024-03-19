@@ -3,7 +3,13 @@ import {Store} from '../src/store';
 
 const response = {
   success: true,
-  data: [{_id: 'testdata'}],
+  data: [
+    {
+      _id: 'testdata',
+      name: 'testdata',
+      updated_at: new Date().toISOString(),
+    },
+  ],
 };
 
 global.fetch = jest.fn(() =>
@@ -16,10 +22,14 @@ let db;
 let result;
 let pushurl = 'http://localhost:8080/api/sync/push';
 let pullurl = 'http://localhost:8080/api/sync/pull';
+let pushDeletedUrl = 'http://localhost:8080/api/sync/push/deleted';
+let pullDeletedUrl = 'http://localhost:8080/api/sync/pull/deleted';
 beforeAll(async () => {
   db = new IndexDBHelper('myPOSDb', {
     pushUrl: pushurl,
     pullUrl: pullurl,
+    pushDeletedUrl: pushDeletedUrl,
+    pullDeletedUrl: pullDeletedUrl,
     lastUpdateName: 'updated_at',
   });
   result = await db.versions(1).stores([
@@ -44,6 +54,8 @@ describe('test 1', () => {
     expect(db.users).toBeInstanceOf(Store);
     expect(db.pullUrl).toBe(pullurl);
     expect(db.pushUrl).toBe(pushurl);
+    expect(db.pushDeletedUrl).toBe(pushDeletedUrl);
+    expect(db.pullDeletedUrl).toBe(pullDeletedUrl);
     expect(db.lastUpdateName).toBe('updated_at');
   });
 });
@@ -108,5 +120,23 @@ describe('test last update', () => {
     expect(result[0].name).toBe('users');
 
     await expect(db.pull()).resolves.toEqual(['users']);
+    await expect(db.pullDeleted()).resolves.toEqual(['users']);
+  });
+
+  test('test user delete', async () => {
+    const result2 = await db.users.findKey();
+    expect(result2.length).toBe(4);
+
+    await expect(db.users.delete('users_1')).resolves.toBe('OK');
+    const result0 = await db.users.findKey();
+    expect(result0.length).toBe(3);
+
+    const result1 = await db.deleted.findKey();
+    expect(result1.length).toBe(1);
+    expect(result1[0].name).toBe('users');
+    expect(result1[0].deleted_id).toBe('users_1');
+
+    await expect(db.pushDeleted()).resolves.toEqual(['users']);
+    await expect(db.pushDeleted()).resolves.toEqual([]);
   });
 });

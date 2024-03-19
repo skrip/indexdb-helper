@@ -21,7 +21,7 @@ beforeAll(async () => {
     pushUrl: pushurl,
     pullUrl: pullurl,
   });
-  result = await db.versions(1).stores([
+  result = await db.versions(2).stores([
     {
       name: 'users',
       sync: true,
@@ -75,6 +75,7 @@ describe('test 1', () => {
     expect(db.products).toBeInstanceOf(Store);
     expect(db.category).toBeInstanceOf(Store);
     expect(db.setting).toBeInstanceOf(Store);
+    expect(db.deleted).toBeInstanceOf(Store);
     expect(db.pullUrl).toBe(pullurl);
     expect(db.pushUrl).toBe(pushurl);
     expect(db.lastUpdateName).toBe('last_update');
@@ -331,7 +332,7 @@ describe('test find', () => {
 describe('test close db and upgrade', () => {
   test('test close upgrade db', async () => {
     db.close();
-    result = await db.versions(2).stores([
+    result = await db.versions(3).stores([
       {
         name: 'users',
       },
@@ -369,5 +370,21 @@ describe('test close db and upgrade', () => {
     expect(db.users).toBeInstanceOf(Store);
     expect(db.products).toBeInstanceOf(Store);
     expect(db.category).toBeInstanceOf(Store);
+  });
+});
+
+describe('test error', () => {
+  test('test error db when upgrade', async () => {
+    db.close();
+
+    try {
+      await db.versions(1).stores([
+        {
+          name: 'users',
+        },
+      ]);
+    } catch (err) {
+      expect(err).toHaveProperty('message', 'VersionError');
+    }
   });
 });

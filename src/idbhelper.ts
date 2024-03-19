@@ -1,9 +1,12 @@
 import {Store} from './store';
+import {IndexDBHelperError} from './error';
 
 export interface IndbOption {
   indexedDB?: typeof indexedDB;
   pushUrl?: string;
   pullUrl?: string;
+  pushDeletedUrl?: string;
+  pullDeletedUrl?: string;
   lastUpdateName?: string;
 }
 export interface IStoreIndex {
@@ -17,6 +20,7 @@ export interface IStores {
   sync?: boolean;
   autoIncrement?: boolean;
   indexes?: Array<IStoreIndex>;
+  shoudDeleteWhenUpgrade?: boolean;
 }
 
 export interface IModel {
@@ -24,8 +28,13 @@ export interface IModel {
   name?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface IModelSetting extends IModel {
   last_push?: string;
   last_pull?: string;
+  last_push_deleted?: string;
+  last_pull_deleted?: string;
 }
 
 export class IndexDBHelper {
@@ -42,8 +51,11 @@ export class IndexDBHelper {
   private _idxdb = indexedDB;
   private _db: IDBDatabase;
   private _nameTableSetting = 'setting';
+  private _nameTableDeleted = 'deleted';
   private _pushUrl = '';
+  private _pushDeletedUrl = '';
   private _pullUrl = '';
+  private _pullDeletedUrl = '';
   private _lastUpdateName = 'last_update';
 
   constructor(name: string, option?: IndbOption) {
@@ -58,6 +70,12 @@ export class IndexDBHelper {
       }
       if (option.pullUrl) {
         this._pullUrl = option.pullUrl;
+      }
+      if (option.pushDeletedUrl) {
+        this._pushDeletedUrl = option.pushDeletedUrl;
+      }
+      if (option.pullDeletedUrl) {
+        this._pullDeletedUrl = option.pullDeletedUrl;
       }
       if (option.lastUpdateName) {
         this._lastUpdateName = option.lastUpdateName;
@@ -100,12 +118,69 @@ export class IndexDBHelper {
     }
   };
 
+  async pushDeleted() {
+    let cek = [];
+    for (let key in this) {
+      if (this[key].constructor.name === 'Store') {
+        let storeTable = this[key] as Store<IModel>;
+        let storeDeleted = this.deleted as Store<IModel>;
+        let storeSetting = this.setting as Store<IModelSetting>;
+        if (storeTable.isSync) {
+          let tbname = storeTable.name;
+          let setting = await storeSetting.get(tbname);
+          let s = null;
+          if (setting) {
+            // sudah pernah sync
+            if (setting.last_push_deleted) {
+              s = new Date(setting.last_push_deleted).toISOString();
+            }
+          }
+
+          let result;
+          if (s !== null) {
+            const keyRangeValue = IDBKeyRange.lowerBound(s);
+            result = await storeDeleted.findKey({
+              index: 'deleted_at',
+              query: keyRangeValue,
+            });
+          } else {
+            result = await storeDeleted.findKey({
+              index: 'deleted_at',
+            });
+          }
+
+          if (result.length > 0) {
+            let res = await this.pushData(
+              this._pushDeletedUrl + `?table=${tbname}`,
+              result
+            );
+            if (res !== 'ERROR') {
+              if (!res.error) {
+                cek.push(tbname);
+                if (setting) {
+                  setting.last_push_deleted = new Date().toISOString();
+                  await storeSetting.update(tbname, setting);
+                } else {
+                  await storeSetting.add({
+                    name: tbname,
+                    last_push_deleted: new Date().toISOString(),
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return cek;
+  }
+
   async push() {
     let cek = [];
     for (let key in this) {
       if (this[key].constructor.name === 'Store') {
         let storeTable = this[key] as Store<IModel>;
-        let storeSetting = this.setting as Store<IModel>;
+        let storeSetting = this.setting as Store<IModelSetting>;
         if (storeTable.isSync) {
           let tbname = storeTable.name;
           let setting = await storeSetting.get(tbname);
@@ -138,10 +213,8 @@ export class IndexDBHelper {
               if (!res.error) {
                 cek.push(tbname);
                 if (setting) {
-                  await storeSetting.update(tbname, {
-                    name: tbname,
-                    last_push: new Date().toISOString(),
-                  });
+                  setting.last_push = new Date().toISOString();
+                  await storeSetting.update(tbname, setting);
                 } else {
                   await storeSetting.add({
                     name: tbname,
@@ -162,7 +235,7 @@ export class IndexDBHelper {
     for (let key in this) {
       if (this[key].constructor.name === 'Store') {
         let storeTable = this[key] as Store<IModel>;
-        let storeSetting = this.setting as Store<IModel>;
+        let storeSetting = this.setting as Store<IModelSetting>;
         if (storeTable.isSync) {
           let tbname = storeTable.name;
           let setting = await storeSetting.get(tbname);
@@ -194,10 +267,8 @@ export class IndexDBHelper {
                 }
               }
               if (setting) {
-                await storeSetting.update(tbname, {
-                  name: tbname,
-                  last_pull: new Date().toISOString(),
-                });
+                setting.last_pull = new Date().toISOString();
+                await storeSetting.update(tbname, setting);
               } else {
                 await storeSetting.add({
                   name: tbname,
@@ -212,13 +283,63 @@ export class IndexDBHelper {
     return cek;
   }
 
+  async pullDeleted() {
+    let cek = [];
+    for (let key in this) {
+      if (this[key].constructor.name === 'Store') {
+        let storeTable = this[key] as Store<IModel>;
+        let storeSetting = this.setting as Store<IModelSetting>;
+        if (storeTable.isSync) {
+          let tbname = storeTable.name;
+          let setting = await storeSetting.get(tbname);
+          let s = null;
+          if (setting) {
+            // sudah pernah sync
+            if (setting.last_pull_deleted) {
+              s = new Date(setting.last_pull_deleted).toISOString();
+            }
+          }
+          let data = await this.pullData(
+            this._pullDeletedUrl + `?table=${tbname}&last_update=${s}`
+          );
+          if (data.success) {
+            if (data.data.length > 0) {
+              cek.push(tbname);
+              for (let i = 0; i < data.data.length; i++) {
+                let row = data.data[i];
+                let kid = row['deleted_id'];
+                if (kid) {
+                  try {
+                    // ada peluang id sama
+                    let dt = await storeTable.delete(kid);
+                  } catch (error) {}
+                }
+              }
+              if (setting) {
+                setting.last_pull_deleted = new Date().toISOString();
+                await storeSetting.update(tbname, setting);
+              } else {
+                await storeSetting.add({
+                  name: tbname,
+                  last_pull_deleted: new Date().toISOString(),
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+    return cek;
+  }
+
   stores(data: Array<IStores>): Promise<string> {
     return new Promise((resolve, reject) => {
       const openOrCreateDB = this._idxdb.open(this._name, this._version);
-      openOrCreateDB.addEventListener('error', (error) => {
-        console.log('itu error ', error);
-        reject('Error opening DB');
-      });
+
+      openOrCreateDB.onerror = (event) => {
+        let target = event.target as IDBOpenDBRequest;
+        reject(new IndexDBHelperError(target.error));
+      };
 
       openOrCreateDB.addEventListener('success', () => {
         this._db = openOrCreateDB.result;
@@ -244,17 +365,27 @@ export class IndexDBHelper {
             this._db,
             'name'
           );
+          inew[this._nameTableDeleted] = new Store(
+            this._nameTableDeleted,
+            this._db,
+            'name'
+          );
           Object.assign(this, inew);
         }
         resolve('Successfully opened DB');
       });
 
-      openOrCreateDB.addEventListener('upgradeneeded', async (event) => {
+      openOrCreateDB.addEventListener('upgradeneeded', (event) => {
         let target = event.target as IDBOpenDBRequest;
         let db = target.result;
 
         if (Array.isArray(data)) {
           for (let i = 0; i < data.length; i++) {
+            if (db.objectStoreNames.contains(data[i].name)) {
+              if (data[i].shoudDeleteWhenUpgrade) {
+                db.deleteObjectStore(data[i].name);
+              }
+            }
             if (!db.objectStoreNames.contains(data[i].name)) {
               //db.deleteObjectStore(collectionName.STATES);
 
@@ -283,6 +414,18 @@ export class IndexDBHelper {
                 autoIncrement: false,
               });
             }
+            if (!db.objectStoreNames.contains(this._nameTableDeleted)) {
+              const objStore = db.createObjectStore(this._nameTableDeleted, {
+                keyPath: 'name',
+                autoIncrement: false,
+              });
+              objStore.createIndex('deleted_id', 'deleted_id', {
+                unique: true,
+              });
+              objStore.createIndex('deleted_at', 'deleted_at', {
+                unique: false,
+              });
+            }
           }
         }
       });
@@ -299,6 +442,14 @@ export class IndexDBHelper {
 
   get pullUrl() {
     return this._pullUrl;
+  }
+
+  get pushDeletedUrl() {
+    return this._pushDeletedUrl;
+  }
+
+  get pullDeletedUrl() {
+    return this._pullDeletedUrl;
   }
 
   get lastUpdateName() {

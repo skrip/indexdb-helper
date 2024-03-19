@@ -71,14 +71,35 @@ export class Store<Type> {
 
   public delete(id: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const transaction = this._db.transaction([this._name], 'readwrite');
+      let dblist = [this._name];
+      if (this._sync) {
+        dblist.push('deleted');
+      }
+      const transaction = this._db.transaction(dblist, 'readwrite');
       const objectStore = transaction.objectStore(this._name);
       const request = objectStore.delete(id);
-      request.onerror = (event) => {
-        reject('error');
-      };
-      request.onsuccess = (event) => {
+      // request.onerror = (event) => {
+      //   reject('error');
+      // };
+      // request.onsuccess = (event) => {
+      //   resolve('OK');
+      // };
+      if (this._sync) {
+        const objectStoreDelete = transaction.objectStore('deleted');
+        objectStoreDelete.add({
+          name: this._name,
+          deleted_id: id,
+          deleted_at: new Date().toISOString(),
+        });
+      }
+
+      transaction.oncomplete = (event) => {
         resolve('OK');
+      };
+
+      transaction.onerror = (event) => {
+        console.log(event.target);
+        reject('error');
       };
     });
   }
