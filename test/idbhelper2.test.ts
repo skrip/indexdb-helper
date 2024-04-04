@@ -124,17 +124,31 @@ describe('test last update', () => {
   });
 
   test('test user delete', async () => {
+    let d2 = new Date();
+    await expect(
+      db.users.add({
+        _id: 'users_4',
+        name: 'users 4',
+        updated_at: d2.toISOString(), //100, //new Date('2023-10-02T12:00:00.000Z'),
+      })
+    ).resolves.toBe('OK');
+
     const result2 = await db.users.findKey();
-    expect(result2.length).toBe(4);
+    expect(result2.length).toBe(5);
 
     await expect(db.users.delete('users_1')).resolves.toBe('OK');
     const result0 = await db.users.findKey();
-    expect(result0.length).toBe(3);
+    expect(result0.length).toBe(4);
+
+    await expect(db.users.delete('users_4')).resolves.toBe('OK');
+    const result10 = await db.users.findKey();
+    expect(result10.length).toBe(3);
 
     const result1 = await db.deleted.findKey();
-    expect(result1.length).toBe(1);
+    expect(result1.length).toBe(2);
     expect(result1[0].name).toBe('users');
     expect(result1[0].deleted_id).toBe('users_1');
+    expect(result1[1].deleted_id).toBe('users_4');
 
     await expect(db.pushDeleted()).resolves.toEqual(['users']);
     await expect(db.pushDeleted()).resolves.toEqual([]);

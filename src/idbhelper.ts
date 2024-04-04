@@ -416,8 +416,8 @@ export class IndexDBHelper {
             }
             if (!db.objectStoreNames.contains(this._nameTableDeleted)) {
               const objStore = db.createObjectStore(this._nameTableDeleted, {
-                keyPath: 'name',
-                autoIncrement: false,
+                keyPath: 'id',
+                autoIncrement: true,
               });
               objStore.createIndex('deleted_id', 'deleted_id', {
                 unique: true,
